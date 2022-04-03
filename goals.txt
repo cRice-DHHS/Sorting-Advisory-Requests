@@ -1,0 +1,35 @@
+        PROCESS TO MAKE HAPPEN:
+
+01. Import student-survey data (as Student objects)
+02. Use 'known' student roster (sort roster first)
+        A. find student ID numbers, for student objects
+        B. add in any students who did not complete survey
+        c. change all peer requests to foreign keys
+        D. identify all student-survey data that needs 'cleaned'
+03. Report all data that needs manually 'cleaned' from name entries in survey
+04. Import teacher-survey data
+05. Use 'known' teacher roster (sort roster first)
+        A. add in teachers who did not complete survey
+        B. assign unique ID/email/lookup name
+|||||||||||||||| START repeated section for each grade ||||||||||||||||||||||||||||
+06. Build Graph data from all student requests
+07. Partition students from Graph data ---
+        A. recursive test to find ideal LouvianResolution
+        B. actually partition the students into sections
+08. graph data from each class for an image (just for fun)
+09. Add students without Graph requests to the partitions, maintaining max & even class sizes
+10. Append partitions to list of all Sections objects
+|||||||||||||||| END repeated section for each grade ||||||||||||||||||||||||||||||
+11. sort teachers by comfort level - unknown considered 50th percentile
+12. pair high with low teachers until all pairs formed
+        A. will need to be a list of TeacherPair objects with unique IDs
+13. Score student-votes for TeacherPairs ||2D table: [Section.id, TeacherPair.id, vote_count] *votes start with zero
+        A. Totaling votes for all TeacherPairs per section (if > 0 votes)
+        B. assign TeacherPair to classes:
+            -------START repeated for all classes--------------------
+              I. highest votes in any class to identify teacherpair of interest
+             II. If no remaining votes, assign teacher-pairs arbitrarily
+            III. teacher-pair of interest then to the class with highest corresponding votes
+             IV. recalculate votes for teacher-pairs, removing assigned class
+            -------END repeated for all classes--------------------
+14. output CSV files for each class, so they can be edited by hand + entered into Infinite Campus
