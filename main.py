@@ -266,7 +266,6 @@ total_parts = Freshmen.numParts + Sophomores.numParts + Juniors.numParts + Senio
 print("\tExpanded to",total_parts,"partitions, to fit all known students.")
 
 # STEP-10. Append partitions to list of all Sections objects
-sections = []
 Freshmen.addToMainSections(sections)
 Sophomores.addToMainSections(sections)
 Juniors.addToMainSections(sections)
