@@ -197,7 +197,8 @@ class GraphData:
                 countWorking += 1
                 if newMinRes == 0.0: newMinRes = j["resolution"]
                 if newMaxRes <= j["resolution"]: newMaxRes = j["resolution"]
-        avg = sumRes/countWorking
+        if countWorking == 0: avg = 1
+        else: avg = sumRes/countWorking
         if newMaxRes == 0: newMaxRes=10        
         results = {"minR":newMinRes,"maxR":newMaxRes,"avg":avg,"asymptote":asymptote,"inc":increment}
         return results
