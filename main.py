@@ -132,14 +132,12 @@ if dataToBeCleaned: #this is for all name entry errors in 2-C & 2-D
 with open('real-data/tester-teachers.csv') as csvfile:
         teacherReader = csv.DictReader(csvfile, delimiter=',')
         #------------- main teachers objects & array ----------------------
-        this_id = 0
         for row in teacherReader:
-            this_id +=1
             teachers.append(Teacher(**row))
             new = teachers[-1]
-            new.id = this_id
             name = new.email.split("@") #breakupEmail | part 1
             name = name[0].split(".")   #breakupEmail | part 2
+            new.comfort = int(new.comfort) #useful laster...
             new.lookupName = lookupNameFromEmail(new.email)
 
         print("\t", len(teachers), "\tunique Teacher-s in 'teachers' array, from survey")
@@ -147,7 +145,17 @@ with open('real-data/tester-teachers.csv') as csvfile:
 
 # STEP-05. Use 'known' teacher roster (sort roster first)
 # === 5-A. add in teachers who did not complete survey
-# === 5-B. assign unique ID/email/lookup name <-------------- maybe not...
+with open('real-data/2023teachers.csv') as csvfile:
+        teacherReader = csv.DictReader(csvfile, delimiter=',')
+        #------------- main teachers objects & array ----------------------
+        for row in teacherReader:
+            teachers.append(Teacher(**row))
+            new = teachers[-1]
+            name = new.firstName+new.lastName
+            new.lookupName = new.simpleFullName(name)
+
+        print("\t", len(teachers), "\tunique Teacher-s in 'teachers' array, from known list")
+        # print(teachers[-6].__dict__) #check contents of Roster info
 
 # /\    /\    /\    /\    /\    /\    /\    /\    /\    /\    /\    /\  
 #/  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /
@@ -276,33 +284,59 @@ Seniors.addToMainSections(sections)
 #    \/    \/    \/    \/    \/    \/    \/    \/    \/    \/    \/    \/
 #---- Sort & pair teachers by comfort, making dyads ----------------------
 # STEP-11. sort teachers by comfort level - unknown considered 50th percentile
-# STEP-12. pair high with low teachers until all pairs formed
-# == 12-A. will need to be a list of TeacherPair objects with unique IDs
+for teacher in teachers:
+    if not hasattr(teacher, "comfort"): teacher.comfort = 3
+teachers.sort(key=lambda t: t.comfort)
+
+# STEP-12. pair high with low teachers until all pairs formed #middle-est teacher left out if odd-number
+dyads = []
+# print(teachers)
+for teacher in teachers:
+    if teacher == teachers[-1]: print(teacher.lookupName, "didn't get paired into a teacher-dyad.") #don't leave a teacher on their own...
+    dyads.append(Dyad(teacher,teachers.pop()))
+# for d in dyads:
+#     print(d.__dict__)
 
 # /\    /\    /\    /\    /\    /\    /\    /\    /\    /\    /\    /\  
 #/  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /
 #    \/    \/    \/    \/    \/    \/    \/    \/    \/    \/    \/    \/
 #---- Import & clean student data from survey/ known roster ---------------
-# STEP-13. Score student-votes for TeacherPairs ||2D table: [Section.id, TeacherPair.id, vote_count] *votes start with zero
-# == 13-A. Totaling votes for all TeacherPairs per section (if > 0 votes)
+# STEP-13. Score student-votes for TeacherPairs || each dyad holds a record of all their votes across sections *votes start with zero
+for dyad in dyads:
+    dyad.votesCount(sections)
     
 # /\    /\    /\    /\    /\    /\    /\    /\    /\    /\    /\    /\  
 #/  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /
 #    \/    \/    \/    \/    \/    \/    \/    \/    \/    \/    \/    \/
-#---- Assign TeacherPairs to classes -------------------------------------
-# == 13-B. assign TeacherPair to classes:
-#     -------START repeated for all classes--------------------
-# === I. highest votes in any class to identify teacherpair of interest
-# == II. If no remaining votes, assign teacher-pairs arbitrarily
-# = III. teacher-pair of interest then to the class with highest corresponding votes
-# == IV. recalculate votes for teacher-pairs, removing assigned class
-# -------END repeated for all classes--------------------
+#---- Assign TeacherPairs to section -------------------------------------
+# == 13-B. assign TeacherPair to section:
+#     -------START repeated for all sections--------------------
+# === I. highest votes in any sections to identify teacherpair of interest
+dyads.sort(key=lambda t: -t.totalVotes)
+for dyad in dyads:
+# == II. teacher-pair of interest then to the class with highest corresponding votes
+    dyad.sectionVotes.sort(key=lambda t: -t[1])
+    for s in dyad.sectionVotes: #list of all sections
+        this_section = s[0]
+        if this_section.missingTeachers() and dyad.unplaced:
+            i = sections.index(this_section)
+            sections[i].teachers.append(dyad.teacher1)
+            sections[i].teachers.append(dyad.teacher2)
+            dyad.unplaced = False
+        #this method leaves out the most middle-est teachers as advisory leaders
+
+# for d in dyads:
+#     if d.unplaced: print(d.teacher1.lookupName,'\t and \t',d.teacher2.lookupName,' \tnot assigned to a section')
 
 # /\    /\    /\    /\    /\    /\    /\    /\    /\    /\    /\    /\  
 #/  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /
 #    \/    \/    \/    \/    \/    \/    \/    \/    \/    \/    \/    \/
 #---- Export results -----------------------------------------------------
 # STEP-14. output CSV files for each class, so they can be edited by hand + entered into Infinite Campus
+
+# print(students[3].__dict__)
+# print(teachers[3].__dict__)
+
 #clear old CSV files
 files = glob.glob('sections/*.csv')
 for f in files:
@@ -312,10 +346,11 @@ for f in files:
         print("Error: %s : %s" % (f, e.strerror))
 #make new CSV files
 for n in sections:
-    filename = 'sections/#'+str(n.id)+'---grade-'+str(n.grade)+'.csv'
+    filename = 'sections/sec'+str(n.id)+'---gr'+str(n.grade)+'.csv'
     grade = '' if n.grade is None else 'grade ' + str(n.grade)
     with open(filename, 'w', newline='\n') as csvfile:
         output = csv.writer(csvfile, delimiter=',')
-        output.writerow(['role','id','lookupName',grade])
-        for i in n.teachers: output.writerow(['teacher',i.id,findPersonByID(teachers,i.id).lookupName])
-        for j in n.roster: output.writerow(['student',j.id,findPersonByID(students,j.id).lookupName])
+        output.writerow(['role','id','lookupName',grade,'section '+str(n.id)])
+        for i in n.teachers: output.writerow(['teacher','n/a',i.lookupName])
+        for j in n.roster: output.writerow(['student',j.id,j.lookupName])
+        

@@ -1,11 +1,58 @@
+import random
 from functions import *
 
 class Section:
-    def __init__(self,id,roster,grade):
-        self.id = id
+    def __init__(self,roster,grade):
         self.roster = roster
         self.teachers = []
         self.grade = grade
+
+    def __hash__(self):      #make sections available as keys
+        return hash(self)
+
+    def __eq__(self, other): #make sections available as keys
+        return (self.__hash__ == other.__hash__)
+
+    def __ne__(self, other): #make sections available as keys
+        return not(self.__hash__ == other.__hash__)
+    
+    def missingTeachers(self):
+        if len(self.teachers)==0:
+            return True
+        else:
+            return False
+
+class Dyad:
+    def __init__(self,teacher1,teacher2):
+        self.teacher1 = teacher1
+        self.teacher2 = teacher2
+        self.sectionVotes = [] #[section.id, votes]
+        self.totalVotes = 0
+        self.unplaced = True
+    
+    def __hash__(self):      #make dyads available as keys
+        return hash((self.id))
+
+    def __eq__(self, other): #make dyads available as keys
+        return (self.__hash__) == (other.__hash__)
+
+    def __ne__(self, other): #make dyads available as keys
+        return not(self.__hash__ == other.__hash__)
+
+    def votesCount(self, sections):
+        for section in sections:
+            votes = 0
+            for student in section.roster:
+                for teacher in student.teachers:
+                    if teacher == self.teacher1.lookupName: votes += 1
+                    if teacher == self.teacher2.lookupName: votes += 1
+            self.sectionVotes.append([section,votes])
+        self.sumVotes()
+    
+    def sumVotes(self):
+        for section in self.sectionVotes:
+            self.totalVotes += section[1]
+
 
 # /\    /\    /\    /\    /\    /\    /\    /\    /\    /\   
 #/  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \
@@ -20,10 +67,10 @@ class Person:
         return hash((self.id))
 
     def __eq__(self, other): #make people available as keys
-        return (self.id) == (other.id)
+        return (self.__hash__) == (other.__hash__)
 
     def __ne__(self, other): #make people available as keys
-        return not(self.id == other.id)
+        return not(self.__hash__ == other.__hash__)
 
     #go from 'Joe Smith' to 'joesmith'
     def simpleFullName(self, name):
@@ -244,15 +291,16 @@ class GraphData:
             self.parts[lost_soul] = opening
 
     def addToMainSections(self, sections):
-        new_id = len(sections)
+        this_id = len(sections)
         for section in range(self.numParts):
-            new_id += 1
             grade = self.grade
             roster = []
             for student in self.parts:
                 if self.parts[student] == section: 
                     roster.append(student)
-            sections.append(Section(new_id,roster,grade))
+            sections.append(Section(roster,grade))
+            this_id += 1    #want unique section numbers for export
+            sections[-1].id = this_id
         
 
     def setColorsAndLabels(self):

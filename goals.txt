@@ -22,7 +22,6 @@
 |||||||||||||||| END repeated section for each grade ||||||||||||||||||||||||||||||
 11. sort teachers by comfort level - unknown considered 50th percentile
 12. pair high with low teachers until all pairs formed
-        A. will need to be a list of TeacherPair objects with unique IDs
 13. Score student-votes for TeacherPairs ||2D table: [Section.id, TeacherPair.id, vote_count] *votes start with zero
         A. Totaling votes for all TeacherPairs per section (if > 0 votes)
         B. assign TeacherPair to classes:
