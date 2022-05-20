@@ -10,8 +10,8 @@ from functions import *
 #------------- PREAMBLE -------------------------------------------------
 
 idealClassSize = 16 #the number of students we want in a class
-partitioning_resolution = 1 #number taken from testing function output
-number_of_tests = 100 #self-calibration tests: higher number, longer time
+partitioning_resolution = 3 #number taken from testing function output
+number_of_tests = 2 #self-calibration tests: higher number, longer time
 # use 100 while testing
 # use 1000 while running the real thing.
 
@@ -24,7 +24,7 @@ sections=[]
 #    \/    \/    \/    \/    \/    \/    \/    \/    \/    \/    \/    \/
 #---- Import & clean STUDENT data from survey/ known roster---------------
 # STEP-01: Import student-survey data (as Student objects)
-with open('real-data/tester-students.csv') as csvfile:
+with open('real-data/real-student-requests.csv') as csvfile:
         studentReader = csv.DictReader(csvfile, delimiter=',')
         #------------- main students objects & array ----------------------
         for row in studentReader:
@@ -33,8 +33,11 @@ with open('real-data/tester-students.csv') as csvfile:
             new.id = 0 #filler id, until STEP 2-B
             new.makeFriendsRequestArray() #formatted as simpleFullName-s
             new.makeTeachersRequestArray()
+            new.full_name = new.full_name.title()
             new.lookupName = new.simpleFullName(new.full_name)
-            new.grade = 0 #filler number-grade, until STEP 2-B
+            new.surname = new.surname(new.full_name)
+            new.grade = 'Sophomore' #filler number-grade, until STEP 2-B
+            new.gradeToNextGrade()
 
         print("\t", len(students), "\tunique Student-s in 'students' array, from survey")
         # print(students[0].__dict__) #check contents of new Student object
@@ -49,8 +52,8 @@ with open('real-data/2023studentroster.csv') as csvfile:
             ref_array.append(Student(**row))
             new = ref_array[-1] #shorten the reference name
             name = new.firstName + new.lastName
+            new.surname = new.lastName.lower()
             new.lookupName = new.simpleFullName(name)
-
         print("\t", len(ref_array), "\tunique Student-s in 'known roster' array")
         # print(ref_array[1].__dict__) #check contents of Roster info
 
@@ -69,6 +72,10 @@ for stu in ref_array:
         new.friends=[]  #no requested peers
         new.teachers=[] #no requested teachers
         new.grade = int(stu.nextGrade)
+        new.full_name = new.firstName+' '+new.lastName
+        new.full_name = new.full_name.title()
+        new.email = emailFromFirstLast(new.firstName,new.lastName)
+
 
 print("\t", len(students), "\tunique Student-s in 'students' array")
 # for n in students: 
@@ -78,29 +85,40 @@ print("\t", len(students), "\tunique Student-s in 'students' array")
 # === 2-C. identify all student-survey data that needs 'cleaned'
 dataToBeCleaned=[] #this is for all name entry errors in 2-C & 2-D
 
+#for students who enter their own names incorrectly
 for i in students:
     for j in ref_array:
         if i.lookupName == j.lookupName:
             i.accountedFor = True
-            break
+            break #stop the search when you find them
         else:
             i.accountedFor = False
-for i in students:
+for i in students: 
     if i.accountedFor == False:
+        #
         dataToBeCleaned.append([i.lookupName])
 
 # print(students[4].__dict__) #early entries come from the survey
 
-# === 2-D. change all peer requests to foreign keys
+# === 2-D. change all peer requests to ID
 for student in students:
     friend_error=[]
     for request in enumerate(student.friends):
         if request[1]: #if it is not empty
-            friendID = findIDbyLookupName(students, request[1])
-            if friendID:
-                student.friends[request[0]] = findIDbyLookupName(students, request[1])
-            else:
-                friend_error.append(request[1])
+            lookupName = request[1][0]
+            thisSurname = request[1][1]
+            friendID = findIDbyLookupName(students, lookupName)
+            if friendID: #found by lookupname
+                student.friends[request[0]] = findIDbyLookupName(students, lookupName)
+            elif lastNameBool(students, student, thisSurname): #can find by last name
+                found_friend = findIDByLastName(students, student, thisSurname)
+                if found_friend != student.id:
+                    # print('found:',findPersonByID(students, found_friend).lookupName,'by last name only. Requested by:',student.lookupName)
+                    student.friends[request[0]] = found_friend
+                friend_error.append(findPersonByID(students, found_friend).lookupName+' !found by surname')  
+            else: #just can't find them
+                # print(thisSurname, 'not found in same grade as',student.lookupName)
+                friend_error.append(lookupName)
     if friend_error:
         dataToBeCleaned.append([student.lookupName,friend_error])
 
@@ -129,7 +147,7 @@ if dataToBeCleaned: #this is for all name entry errors in 2-C & 2-D
 #    \/    \/    \/    \/    \/    \/    \/    \/    \/    \/    \/    \/
 #---- Import & clean TEACHER data from survey/ known roster --------------
 # STEP-04. Import teacher-survey data
-with open('real-data/tester-teachers.csv') as csvfile:
+with open('real-data/real-teacher-requests.csv') as csvfile:
         teacherReader = csv.DictReader(csvfile, delimiter=',')
         #------------- main teachers objects & array ----------------------
         for row in teacherReader:
@@ -137,6 +155,10 @@ with open('real-data/tester-teachers.csv') as csvfile:
             new = teachers[-1]
             name = new.email.split("@") #breakupEmail | part 1
             name = name[0].split(".")   #breakupEmail | part 2
+            new.lastName = name[0]
+            new.firstName = name[1]
+            new.full_name = new.firstName+' '+new.lastName
+            new.full_name = new.full_name.title()
             new.comfort = int(new.comfort) #useful laster...
             new.lookupName = lookupNameFromEmail(new.email)
 
@@ -149,13 +171,27 @@ with open('real-data/2023teachers.csv') as csvfile:
         teacherReader = csv.DictReader(csvfile, delimiter=',')
         #------------- main teachers objects & array ----------------------
         for row in teacherReader:
-            teachers.append(Teacher(**row))
-            new = teachers[-1]
-            name = new.firstName+new.lastName
-            new.lookupName = new.simpleFullName(name)
+            row["lookupName"] = lookupNameFromFirstLast(row["firstName"],row["lastName"])
+            row["unknown"] = True
+            for teacher in teachers:
+                if teacher.lookupName == row["lookupName"]:
+                    teacher.postion = row["position"]
+                    row["unknown"] = False
+                    break
+            if row["unknown"]:
+                teachers.append(Teacher(**row))
+                new = teachers[-1]
+                name = new.firstName+new.lastName
+                new.full_name = new.firstName+' '+new.lastName
+                new.full_name = new.full_name.title()
+                new.lookupName = new.simpleFullName(name)
+                new.email = emailFromFirstLast(new.firstName,new.lastName)
 
         print("\t", len(teachers), "\tunique Teacher-s in 'teachers' array, from known list")
         # print(teachers[-6].__dict__) #check contents of Roster info
+
+idealClassSize = math.floor(len(students)/(len(teachers)/2))-1
+print('\t',idealClassSize, "is the new idealClassSize")
 
 # /\    /\    /\    /\    /\    /\    /\    /\    /\    /\    /\    /\  
 #/  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /
@@ -190,9 +226,9 @@ Seniors.defineGraphEdges()
 
 # STEP-07. Partition students from Graph data ---
 # === 7-A. Test to find ideal LouvianResolution
-starting_minRes = 0.001
+starting_minRes = 4
 starting_maxRes = 10
-starting_avgRes = 1
+starting_avgRes = 7
 # number_of_tests = 100 #<-------------- make 1000 for real deal...
 if Freshmen.graph:
     print("\t\tFinding ideal resolution for Freshmen.")
@@ -218,15 +254,23 @@ if Seniors.graph:
 # === 7-B. Actually partition students into seperate sections, from tests above
 if Freshmen.resolution != 1:
     Freshmen.calibratedPartitions(Freshmen.resolution)
+else:
+    Freshmen.simplePartitions()
 if Sophomores.resolution != 1:
     Sophomores.calibratedPartitions(Sophomores.resolution)
+else:
+    Sophomores.simplePartitions()
 if Juniors.resolution != 1:
     Juniors.calibratedPartitions(Juniors.resolution)
+else:
+    Juniors.simplePartitions()
 if Seniors.resolution != 1:
     Seniors.calibratedPartitions(Seniors.resolution)
+else:
+    Seniors.simplePartitions()
 
 total_parts = Freshmen.numParts + Sophomores.numParts + Juniors.numParts + Seniors.numParts
-print("\t",total_parts," automatically generated partitions")
+# print("\t",total_parts," automatically generated partitions")
 
 # STEP-08. merge all graph data for an image (just for fun)
 Freshmen.setColorsAndLabels()
@@ -236,19 +280,19 @@ Seniors.setColorsAndLabels()
 
 if Freshmen.parts:
     nx.draw(Freshmen.graph, node_color=Freshmen.colors, node_size=175, labels=Freshmen.labeldict, with_labels = True)
-    plt.savefig("freshmen.png", dpi=200)
+    plt.savefig("img-freshmen.png", dpi=200)
     plt.clf() #so the saved and displayed graph doesn't overlap "clear"
 if Sophomores.parts:
     nx.draw(Sophomores.graph, node_color=Sophomores.colors, node_size=175, labels=Sophomores.labeldict, with_labels = True)
-    plt.savefig("sophomores.png",dpi=200)
+    plt.savefig("img-sophomores.png",dpi=200)
     plt.clf() #so the saved and displayed graph doesn't overlap "clear"
 if Juniors.parts:
     nx.draw(Juniors.graph, node_color=Juniors.colors, node_size=175, labels=Juniors.labeldict, with_labels = True)
-    plt.savefig("juniors.png",   dpi=200)
+    plt.savefig("img-juniors.png",   dpi=200)
     plt.clf() #so the saved and displayed graph doesn't overlap "clear"
 if Seniors.parts:
     nx.draw(Seniors.graph, node_color=Seniors.colors, node_size=175, labels=Seniors.labeldict, with_labels = True)
-    plt.savefig("seniors.png",   dpi=200)
+    plt.savefig("img-seniors.png",   dpi=200)
     plt.clf() #so the saved and displayed graph doesn't overlap "clear"
 
 
@@ -256,22 +300,27 @@ if Seniors.parts:
 #only run this if there are any students in the grade from survey
 if Freshmen.parts and Freshmen.numParts*idealClassSize < len(Freshmen.students):
     Freshmen.expandSectionsToFitStudents()
+    Freshmen.splitPartsThatAreTooBig()
     Freshmen.uplacedStudentsInRandomParts(freshmen)
 
 if Sophomores.parts and Sophomores.numParts*idealClassSize < len(Sophomores.students):
     Sophomores.expandSectionsToFitStudents()
+    Sophomores.splitPartsThatAreTooBig()
     Sophomores.uplacedStudentsInRandomParts(sophomores)
 
 if Juniors.parts and Juniors.numParts*idealClassSize < len(Juniors.students):
     Juniors.expandSectionsToFitStudents()
+    Juniors.splitPartsThatAreTooBig()
     Juniors.uplacedStudentsInRandomParts(juniors)
 
 if Seniors.parts and Seniors.numParts*idealClassSize < len(Seniors.students):
     Seniors.expandSectionsToFitStudents()
+    Seniors.splitPartsThatAreTooBig()
     Seniors.uplacedStudentsInRandomParts(seniors)
 
 total_parts = Freshmen.numParts + Sophomores.numParts + Juniors.numParts + Seniors.numParts
 print("\tExpanded to",total_parts,"partitions, to fit all known students.")
+
 
 # STEP-10. Append partitions to list of all Sections objects
 Freshmen.addToMainSections(sections)
@@ -304,6 +353,9 @@ for teacher in teachers:
 # STEP-13. Score student-votes for TeacherPairs || each dyad holds a record of all their votes across sections *votes start with zero
 for dyad in dyads:
     dyad.votesCount(sections)
+
+print('\t',len(dyads),"many teacher dyads")
+# print(len(sections),"many class sections")
     
 # /\    /\    /\    /\    /\    /\    /\    /\    /\    /\    /\    /\  
 #/  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /  \  /
@@ -334,8 +386,9 @@ for dyad in dyads:
 #---- Export results -----------------------------------------------------
 # STEP-14. output CSV files for each class, so they can be edited by hand + entered into Infinite Campus
 
-# print(students[3].__dict__)
-# print(teachers[3].__dict__)
+# print(students[random.randrange(len(students))].__dict__)
+# print('\n')
+# print(teachers[random.randrange(len(teachers))].__dict__)
 
 #clear old CSV files
 files = glob.glob('sections/*.csv')
@@ -350,7 +403,15 @@ for n in sections:
     grade = '' if n.grade is None else 'grade ' + str(n.grade)
     with open(filename, 'w', newline='\n') as csvfile:
         output = csv.writer(csvfile, delimiter=',')
-        output.writerow(['role','id','lookupName',grade,'section '+str(n.id)])
-        for i in n.teachers: output.writerow(['teacher','n/a',i.lookupName])
-        for j in n.roster: output.writerow(['student',j.id,j.lookupName])
+        output.writerow(['role','id','full_Name','email(probable)',grade,'section '+str(n.id)])
+        for i in n.teachers: 
+            try:
+                output.writerow(['teacher','0000000',i.full_name,i.email])
+            except:
+                print("problem teacher:"+i.__dict__)
+        for j in n.roster: 
+            try:
+                output.writerow(['student',j.id,j.full_name,j.email])
+            except:
+                print("problem student:"+j.__dict__)
         

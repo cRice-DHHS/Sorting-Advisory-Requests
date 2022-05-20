@@ -77,32 +77,43 @@ class Person:
         arr = [x.strip() for x in name.split(' ')]
         sum_name = ''
         for i in arr:
-            sum_name += i
+            if i: sum_name += i
         return sum_name.lower()
+
+    def surname(self, name):
+        arr = name.split(' ')
+        for name in arr:
+            if name is not None: sur_name = name   
+        return sur_name.lower()
 
 class Student(Person):
     def makeFriendsRequestArray(self):
         temp_friends = []
         #forced into repetative code by Google Forms...
-        if isinstance(self.peer1, str):
-            self.peer1 = self.simpleFullName(self.peer1)
-            temp_friends.append(self.peer1)
+        if isinstance(self.peer1, str) and self.peer1:
+            lookup = self.simpleFullName(self.peer1)
+            surname = self.surname(self.peer1)
+            temp_friends.append([lookup, surname])
             del self.peer1
-        if isinstance(self.peer2, str):
-            self.peer2 = self.simpleFullName(self.peer2)
-            temp_friends.append(self.peer2)
+        if isinstance(self.peer2, str) and self.peer2:
+            lookup = self.simpleFullName(self.peer2)
+            surname = self.surname(self.peer2)
+            temp_friends.append([lookup, surname])
             del self.peer2
-        if isinstance(self.peer3, str):
-            self.peer3 = self.simpleFullName(self.peer3)
-            temp_friends.append(self.peer3)
+        if isinstance(self.peer3, str) and self.peer3:
+            lookup = self.simpleFullName(self.peer3)
+            surname = self.surname(self.peer3)
+            temp_friends.append([lookup, surname])
             del self.peer3
-        if isinstance(self.peer4, str):
-            self.peer4 = self.simpleFullName(self.peer4)
-            temp_friends.append(self.peer4)
+        if isinstance(self.peer4, str) and self.peer4:
+            lookup = self.simpleFullName(self.peer4)
+            surname = self.surname(self.peer4)
+            temp_friends.append([lookup, surname])
             del self.peer4
-        if isinstance(self.peer5, str):
-            self.peer5 = self.simpleFullName(self.peer5)
-            temp_friends.append(self.peer5)
+        if isinstance(self.peer5, str) and self.peer5:
+            lookup = self.simpleFullName(self.peer5)
+            surname = self.surname(self.peer5)
+            temp_friends.append([lookup, surname])
             del self.peer5
         self.friends = temp_friends
 
@@ -114,9 +125,21 @@ class Student(Person):
             firstname = temp[2*i+1]
             name = self.simpleFullName(firstname+lastname)
             self.teachers.append(name)
+    
+    def gradeToNextGrade(self):
+        if self.grade == '8th Grade':
+            self.nextGrade = 9
+        elif self.grade == 'Freshman':
+            self.nextGrade = 10
+        elif self.grade == 'Sophomore':
+            self.nextGrade = 11
+        elif self.grade == 'Junior':
+            self.nextGrade = 12
+        # else:
+        #    print("no grade given")
 
 class Teacher(Person):
-    def intentionallybBlank():
+    def intentionallyBlank():
         return
 
 # /\    /\    /\    /\    /\    /\    /\    /\    /\    /\   
@@ -161,7 +184,7 @@ class GraphData:
         for student in self.students:
             for peer in student.friends:
                 if peer:
-                    peer = findPersonByID(self.students, peer)
+                    peer = findPersonByID(self.students, peer) #only looks in same grade
                     if peer and student != peer: #no self-reference
                         self.graph.add_edge(student, peer)
         print("\tGrade",self.grade,self.graph) #readable report for making this graph
@@ -216,7 +239,7 @@ class GraphData:
 
     def simplePartitions(self):
         self.parts = community.best_partition(self.graph) #the resolution seems like it can be anywhere from 1.0 to 0.2n
-
+        self.census = self.sectionCensus(self.parts)
     
     def handleRandomInResolution(self, minRes, maxRes, avg, asymptote, increment):            
         pattern=[]
@@ -269,11 +292,49 @@ class GraphData:
             self.calibratedPartitions(res)
 
     def expandSectionsToFitStudents(self):
-        new_sections = (len(self.students) - (self.numParts*self.idealClassSize))/self.idealClassSize
-        for section in range(0,math.ceil(new_sections)):
-            if len(self.census)==0:self.census.append([0,0])
-            self.census.append([self.census[-1][0]+1,0])
+        needed_sections = math.ceil(len(self.students)/self.idealClassSize)
+        for i in range(needed_sections):
+            try: 
+                self.census[i]
+            except:
+                self.census.append([i,0]) 
         self.numParts = len(self.census)
+
+    def separateBigPartition(self, partID):
+        thisPart =[]
+        for person in self.parts: #keys are individuals, values are the part assignment
+            if self.parts[person] == partID: 
+                thisPart.append(person)
+
+        numToRemove = len(thisPart) - self.idealClassSize
+        if numToRemove == 0: return
+
+        newSection = len(self.census)
+        for part in self.census:
+            if self.idealClassSize-part[1] >= numToRemove: #if there is enough space
+                newSection = part[0] #remember this section number
+                break
+
+        unplaced = []
+        counter = numToRemove%self.idealClassSize
+        if counter == 0: counter = self.idealClassSize
+        for i in range(counter):
+            unplaced.append(thisPart[i])
+
+        while unplaced:
+            lost_soul = unplaced.pop(-1)
+            self.parts[lost_soul] = newSection
+
+        self.census = self.sectionCensus(self.parts)
+        self.numParts = self.partsCount(self.parts)
+
+        if self.census[partID][1] > self.idealClassSize: 
+            self.separateBigPartition(partID)
+
+    def splitPartsThatAreTooBig(self):
+        for section in self.census:
+            if section[1] > self.idealClassSize: 
+                self.separateBigPartition(section[0])
 
     def uplacedStudentsInRandomParts(self, grade_list):
         unplaced = []
@@ -302,7 +363,6 @@ class GraphData:
             this_id += 1    #want unique section numbers for export
             sections[-1].id = this_id
         
-
     def setColorsAndLabels(self):
         for node in self.parts:
             self.colors.append(

@@ -17,3 +17,32 @@ def lookupNameFromEmail(email):
     name = email.split("@")  #cut off email domain
     name = name[0].split(".") #separate names
     return str(name[1]+name[0])
+
+#school email to lookupname
+def lookupNameFromFirstLast(first,last):
+    name = first + last
+    return name.lower()
+
+def surname(name):
+        arr = name.split(' ')
+        for name in arr:
+            if name is not None: sur_name = name    
+        return sur_name.lower()
+
+def lastNameBool(students, requestor, requestee):
+    id = findIDByLastName(students, requestor, requestee)
+    if id: return True
+    return False
+
+def findIDByLastName(students, requestor, requestee):
+    found_count = 0
+    result = 0
+    for stu in students:
+        if requestee and requestee == stu.surname and requestor.grade == stu.nextGrade:
+            # print(requestor.lookupName,'in grade',str(requestor.grade),'asked for',requestee,'in grade',str(stu.nextGrade))
+            found_count += 1
+            result = stu.id
+    if found_count == 1: return result
+
+def emailFromFirstLast(firstName,lastName):
+    return (lastName+'.'+firstName+'@madisonps.org').lower()
